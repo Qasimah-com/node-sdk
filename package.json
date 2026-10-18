@@ -1,0 +1,62 @@
+{
+  "name": "@qasimha/sdk",
+  "version": "0.1.0",
+  "description": "Node.js server SDK for the Qasimha merchant API: checkout sessions, orders, payment links, settlements and webhook verification.",
+  "license": "MIT",
+  "author": "Qasimha",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepack": "npm run build"
+  },
+  "keywords": [
+    "qasimha",
+    "bnpl",
+    "buy-now-pay-later",
+    "instalments",
+    "payments",
+    "checkout",
+    "saudi-arabia",
+    "sdk"
+  ],
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "@types/node": "^22.10.0",
+    "eslint": "^9.20.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.20.0",
+    "undici": "^6.21.0",
+    "vitest": "^4.1.11"
+  }
+}
