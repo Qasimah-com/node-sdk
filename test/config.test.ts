@@ -20,14 +20,14 @@ describe('client construction', () => {
   it('infers the environment and base URL from the key prefix', () => {
     const sandbox = new Qasimha({ apiKey: 'sk_test_abc' });
     expect(sandbox.environment).toBe('sandbox');
-    expect(sandbox.baseUrl).toBe('https://merchant-api-uat.qasimha.com');
+    expect(sandbox.baseUrl).toBe('https://api-uat.qasimha.com');
 
     const production = new Qasimha({ apiKey: LIVE_KEY });
     expect(production.environment).toBe('production');
     expect(production.baseUrl).toBe('https://api.qasimha.com');
     expect(ENVIRONMENT_BASE_URLS).toEqual({
       production: 'https://api.qasimha.com',
-      sandbox: 'https://merchant-api-uat.qasimha.com',
+      sandbox: 'https://api-uat.qasimha.com',
     });
   });
 

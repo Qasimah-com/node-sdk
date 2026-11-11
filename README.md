@@ -20,23 +20,72 @@ import Qasimha from '@qasimha/sdk';           // ESM / TypeScript
 const { Qasimha } = require('@qasimha/sdk');  // CommonJS
 ```
 
-### API release of 2026-09-25
+## Configuration
 
-The return URLs (`merchantUrl`), the hosted `/pay/{orderId}` page as the `paymentUrl` of an online
-session, per-merchant webhook endpoints with their own signing secrets and the `t=…,v1=…`
-signature format, the lookup of an order by your own reference and the plan quote for an amount
-(`checkout.getPlans`, with a publishable key) are available since the merchant API release of
-2026-09-25. Confirm with your environment that it runs that release or a
-later one; the SDK verifies both webhook signature formats, so nothing in your code depends on it.
+### Environments
 
-## Configure
+| | Sandbox | Production |
+|---|---|---|
+| API host | `https://api-uat.qasimha.com` | `https://api.qasimha.com` |
+| Secret key | `sk_test_…` | `sk_live_…` |
+| Publishable key | `pk_test_…` | `pk_live_…` |
 
-Create API keys in the Merchant Portal under Settings → API Keys. Sandbox keys start with
-`sk_test_`, production keys with `sk_live_`; the SDK picks the host from the prefix.
+Create keys in the Merchant Portal under Settings → API Keys. The SDK picks the environment from
+the key prefix: a `sk_test_` key talks to the sandbox, a `sk_live_` key to production. You do not
+set a URL. The `baseUrl` option exists only for a test server you run yourself; leave it unset in
+sandbox and production.
+
+### Where the values live
+
+Keep keys and secrets out of source control and out of the browser or mobile app. Read them from
+environment variables (or a secret store that sets them):
+
+| Variable | Value |
+|---|---|
+| `QASIMHA_API_KEY` | `sk_test_…` in sandbox, `sk_live_…` in production. Required. |
+| `QASIMHA_WEBHOOK_SECRET` | `whsec_…` of the webhook endpoint registered in that environment. |
+| `QASIMHA_PUBLISHABLE_KEY` | `pk_test_…` / `pk_live_…`. Only if you quote plans with `checkout.getPlans`. |
+| `STORE_BASE_URL` (your own name) | The public base URL of this deployment, used to build return URLs. |
 
 ```ts
 import Qasimha from '@qasimha/sdk';
 
+const qasimha = new Qasimha({
+  apiKey: process.env.QASIMHA_API_KEY!,
+  webhookSecret: process.env.QASIMHA_WEBHOOK_SECRET,
+  publishableKey: process.env.QASIMHA_PUBLISHABLE_KEY,   // optional
+});
+
+const storeBaseUrl = process.env.STORE_BASE_URL!;         // e.g. https://shop.example
+const merchantUrl = {
+  success: `${storeBaseUrl}/checkout/qasimha/return?order=${orderReferenceId}`,
+  failure: `${storeBaseUrl}/checkout/qasimha/return?order=${orderReferenceId}`,
+  cancel: `${storeBaseUrl}/cart`,
+};
+```
+
+### Return URLs
+
+`merchantUrl` (`success`, `failure`, optional `cancel`) tells the hosted checkout where to send
+the shopper afterwards. Use `https` URLs on your own site (plain `http` only for `localhost`), and
+build them from the deployment's base URL so sandbox orders return to your test site and
+production orders to your live site. Qasimha appends `orderId`, `orderReferenceId` and `status`
+to the URL. The return is not proof of payment: always confirm with `orders.get(orderId)` (see
+[Handle the return](#handle-the-return-verify-with-ordersget)). Details:
+[return-url-contract.md](../../docs/return-url-contract.md); every setting in one place:
+[configuration.md](../../docs/configuration.md).
+
+### Switching to production
+
+1. Replace `QASIMHA_API_KEY` (and `QASIMHA_PUBLISHABLE_KEY`) with the `sk_live_…` / `pk_live_…`
+   keys from the production Merchant Portal. No code change.
+2. Point `STORE_BASE_URL` at the live site, so the return URLs are production URLs.
+3. Register the production webhook URL and set its `whsec_…` secret as `QASIMHA_WEBHOOK_SECRET`.
+4. Remove any `baseUrl` override.
+
+### Client options
+
+```ts
 const qasimha = new Qasimha({
   apiKey: process.env.QASIMHA_API_KEY!,      // required: sk_test_… or sk_live_…
   webhookSecret: process.env.QASIMHA_WEBHOOK_SECRET,
@@ -52,7 +101,7 @@ const qasimha = new Qasimha({
 | Option | Default | Notes |
 |---|---|---|
 | `apiKey` | — | Required. Must match `^sk_(test\|live)_[A-Za-z0-9]+$`. |
-| `environment` | inferred | `'sandbox'` (`https://merchant-api-uat.qasimha.com`) or `'production'` (`https://api.qasimha.com`). Contradicting the key prefix throws `ConfigurationError`. |
+| `environment` | inferred | `'sandbox'` (`https://api-uat.qasimha.com`) or `'production'` (`https://api.qasimha.com`). Contradicting the key prefix throws `ConfigurationError`. |
 | `baseUrl` | per environment | Overrides the host, for example a test server. Must be `https://`; plain `http://` is accepted only for `localhost` and `127.0.0.1`. |
 | `timeout` | `30000` | Milliseconds per attempt (connect + read). |
 | `maxRetries` | `2` | Extra attempts after the first, 0–5. |
@@ -115,7 +164,7 @@ try {
 
 `currencyCode` defaults to `SAR` (the only currency the API accepts), `countryCode` to `SA`,
 `paymentType` to `pay_by_instalments` and `instalments` to `4`. `shippingAddress` is required by
-the API's validator. `merchantId` and `decisionFeatures` are server-controlled and not exposed.
+the API's validator. Fields the platform sets itself, such as `merchantId`, are not exposed.
 
 `merchantUrl` is accepted on all four create calls (`createSession`, `createPosSession`,
 `createQrSession` and `checkoutLinks.create`) and checked locally against the return-URL contract:
@@ -218,8 +267,8 @@ Both signature formats are accepted and compared in constant time. An endpoint y
 `webhookEndpoints.create` (see Manage webhook endpoints) is signed with its own secret as
 `t=<unix>,v1=<hex>[,v1=<hex>]` — the timestamp is part of the signed material, and a second `v1`
 appears for 24 hours after a secret rotation. An account with no registered endpoint still receives
-the operations-configured global delivery, signed as `sha256=<hex>` over the raw body; there the
-`X-Qasimha-Timestamp` header, when present, is checked against `tolerance`. Any failure throws
+deliveries at an account-level URL set up by Qasimha, signed as `sha256=<hex>` over the raw body;
+there the `X-Qasimha-Timestamp` header, when present, is checked against `tolerance`. Any failure throws
 `WebhookSignatureError` with `reason` set to `missing_header`, `malformed_header`,
 `timestamp_outside_tolerance` or `signature_mismatch`. There is no unsigned path.
 
@@ -227,7 +276,7 @@ Event types on a registered endpoint: `order.confirmed`, `order.declined`, `orde
 `order.partially_fulfilled`, `order.refunded`, `order.partially_refunded`, `order.voided`,
 `order.cancelled`, `order.expired`, `checkout_link.expired` (`order.completed` is accepted as a
 subscription alias of `order.confirmed` for one release). The body carries `orderId`,
-`orderReferenceId`, `status`, `amount`, `currency` and `data.order`. The global delivery keeps its
+`orderReferenceId`, `status`, `amount`, `currency` and `data.order`. The account-level delivery keeps its
 original names — `order.completed`, `order.declined`, `order.voided`, `order.reversed` — and no
 `orderId`; `orders.getByReference(event.orderReferenceId)` resolves it.
 
@@ -560,7 +609,5 @@ npm run typecheck && npm run lint && npm test && npm run build
 
 Unit tests run against an in-process HTTP server and the recorded contract fixtures; nothing
 touches the network. The live smoke test (`test/live.smoke.test.ts`) runs only when
-`QASIMHA_API_KEY` and `QASIMHA_BASE_URL` are set. For a host that must be reached through a local
-tunnel the test — and only the test — honours `QASIMHA_RESOLVE_TO=127.0.0.1` (resolves the hostname
-to that address while keeping SNI) and `QASIMHA_TLS_INSECURE=1`; the SDK itself has no such
-options. Releases are built and published by CI.
+`QASIMHA_API_KEY` and `QASIMHA_BASE_URL` are set, for example a `sk_test_…` key and
+`https://api-uat.qasimha.com`.

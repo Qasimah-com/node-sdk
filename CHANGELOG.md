@@ -30,10 +30,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - `PUT` and `DELETE` requests carry an `Idempotency-Key` and retry like `POST`.
-- README: the return URLs, per-merchant webhook secrets and the `t=…,v1=…` signature format are
-  documented as available since the merchant API release of 2026-09-25.
-- Unit tests follow the re-recorded order fixtures (typed responses, enum names, no decision
-  internals).
+- `order.raw` follows the typed order responses of the API: enum names instead of integers, and
+  internal fields that are not part of the contract are no longer included.
 
 ## [0.1.0] - 2026-09-25
 

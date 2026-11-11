@@ -18,7 +18,7 @@ export type Language = 'ar' | 'en';
 
 export const ENVIRONMENT_BASE_URLS: Readonly<Record<Environment, string>> = Object.freeze({
   production: 'https://api.qasimha.com',
-  sandbox: 'https://merchant-api-uat.qasimha.com',
+  sandbox: 'https://api-uat.qasimha.com',
 });
 
 export const DEFAULT_TIMEOUT_MS = 30_000;
